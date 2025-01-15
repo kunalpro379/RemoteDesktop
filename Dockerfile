@@ -37,11 +37,13 @@ COPY . .
 ENV NODE_ENV=production \
     KURENTO_WS_URI=ws://kurento:8888/kurento \
     NODE_PORT=3096 \
-    DATABASE_URL="postgresql://user:password@host.docker.internal:5432/dbname" \
+    DATABASE_URL="postgresql://user:Lawm2471@host.docker.internal:5432/dbname" \
     DISPLAY=:99
 
 # Expose the correct port
-EXPOSE 3096 8888
+EXPOSE 3096
+EXPOSE 8888
+
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \

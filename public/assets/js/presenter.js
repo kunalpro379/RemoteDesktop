@@ -30,7 +30,7 @@ export default class presenter {
 
     init() {
         var script = document.createElement('script');
-        script.setAttribute("src", window.location.protocol + "//" + window.location.hostname + ":" + this.nodePort + "/socket.io/socket.io.js");
+        script.setAttribute("src", window.location.protocol + "//" + "127.0.0.1:3096/socket.io/socket.io.js");
         script.onload = () => {
             this.registerNodeEvents();
         };

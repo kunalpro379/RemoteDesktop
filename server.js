@@ -20,7 +20,8 @@ const server = http.createServer(app);
 const sio = require('socket.io')({
     cors: {
         origin: "*",
-        methods: ["GET", "POST"]
+        methods: ["GET", "POST"],
+        transports: ['websocket', 'polling']
     }
 });
 
@@ -41,6 +42,8 @@ app.use(function (req, res, next) {
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS, PUT, PATCH, DELETE');
     res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');
     res.setHeader('Access-Control-Allow-Credentials', true);
+    res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
+    res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
     next();
 });
 // Static files middleware
@@ -60,7 +63,7 @@ app.use('/api/user', userRoutes);  // Unprotected route
 app.use(errorHandler);
 
 // Initialize Kurento Manager
-const kurentoManager = new KurentoManager('127.0.0.1', 8888);
+const kurentoManager = new KurentoManager('3.111.33.37', 8888);
 
 // Initialize Socket Handler
 new SocketHandler(sio, kurentoManager);
