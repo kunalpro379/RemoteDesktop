@@ -1,0 +1,29 @@
+body {
+    font-size: 14px;
+    font-family: system-ui;
+    padding: 0;
+    margin: 0;
+}
+
+html, body {
+    height: 100%;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+}
+
+.dsh-status {
+    background-color: #e04b4b;
+    padding: 1rem;
+    margin: 1rem;
+    border-radius: 0.5rem;
+    box-shadow: 0 0 0.5rem rgba(0, 0, 0, 0.18);
+    transition: background-color .2s;
+    width: calc(80% - 2rem);
+    display: none;
+}
+
+/* ...rest of your viewer.css styles... */

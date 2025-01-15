@@ -1,0 +1,37 @@
+{
+  "name": "webrtc-screen-share",
+  "version": "1.0.0",
+  "description": "WebRTC based screen sharing",
+  "main": "server.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "nodemon server.js"
+  },
+  "repository": {
+    "type": "git"
+  },
+  "keywords": [
+    "WebRTC",
+    "Shreen",
+    "Sharing",
+    "Kurento"
+  ],
+"author": "Kunal Patil",
+  "homepage": "https://github.com/rghale/webrtc-screen-share#readme",
+  "dependencies": {
+    "@aws-sdk/client-cognito-identity-provider": "^3.726.1",
+    "@prisma/client": "^5.10.2",
+    "express": "^4.17.1",
+    "https": "^1.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "kurento-client": "^6.16.0",
+    "nodemon": "^3.1.9",
+    "pg": "^8.11.3",
+    "postgresql": "^0.0.1",
+    "socket.io": "^4.1.2",
+    "robotjs": "^0.6.0"
+  },
+  "devDependencies": {
+    "prisma": "^5.10.2"
+  }
+}

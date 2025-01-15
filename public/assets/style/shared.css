@@ -1,0 +1,83 @@
+#sharedScreenArea {
+    position: relative;
+    width: 100%;
+    height: 100vh;
+    overflow: hidden;
+}
+
+.remote-cursor,
+.viewer-cursor {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    pointer-events: none;
+    z-index: 99999; /* Increased z-index to ensure visibility */
+    transition: all 0.1s ease;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    /* Debug styles */
+    background: rgba(255, 0, 0, 0.5);
+    border: 2px solid red;
+}
+
+.viewer-cursor {
+    position: fixed !important;
+    pointer-events: none !important;
+    z-index: 999999 !important;
+    /* ...rest of existing cursor styles... */
+}
+
+.viewer-cursor::before {
+    content: '';
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    background: red;
+    opacity: 0.8;
+}
+
+.viewer-cursor::after {
+    content: attr(data-userid);
+    position: absolute;
+    top: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: black;
+    color: white;
+    padding: 2px 4px;
+    border-radius: 3px;
+    font-size: 10px;
+    white-space: nowrap;
+}
+
+/* Generate different colors for different users */
+.viewer-cursor:nth-of-type(5n+1)::before { background: #FF4136; }
+.viewer-cursor:nth-of-type(5n+2)::before { background: #2ECC40; }
+.viewer-cursor:nth-of-type(5n+3)::before { background: #0074D9; }
+.viewer-cursor:nth-of-type(5n+4)::before { background: #FFDC00; }
+.viewer-cursor:nth-of-type(5n+5)::before { background: #B10DC9; }
+
+/* Cursor interaction states */
+[data-interaction="typing"]::before { 
+    animation: blink 1s infinite;
+}
+[data-interaction="scrolling"]::before { 
+    border-radius: 0;
+    transform: rotate(45deg);
+}
+[data-interaction="panning"]::before { 
+    transform: scale(1.5);
+}
+[data-interaction="selecting"]::before { 
+    clip-path: polygon(0 0, 100% 0, 50% 100%);
+    border-radius: 0;
+}
+[data-interaction="dragging"]::before { 
+    transform: scale(0.8);
+}
+
+@keyframes blink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0; }
+}

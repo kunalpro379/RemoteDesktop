@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Socket.IO Test</title>
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        const socket = io('http://localhost:3096', {
+            query: {
+                session_id: 'test-session',
+                mobile: false
+            }
+        });
+
+        socket.on('connect', () => {
+            console.log('Connected to server!');
+            document.getElementById('status').textContent = 'Connected';
+            document.getElementById('socketId').textContent = socket.id;
+        });
+
+        socket.on('disconnect', () => {
+            console.log('Disconnected from server');
+            document.getElementById('status').textContent = 'Disconnected';
+        });
+
+        function testRegisterHost() {
+            socket.emit('registerHost', (response) => {
+                console.log('Register Host response:', response);
+                document.getElementById('testResult').textContent = 'Register Host response: ' + response;
+            });
+        }
+
+        function testRegisterController() {
+            socket.emit('registerController', (response) => {
+                console.log('Register Controller response:', response);
+                document.getElementById('testResult').textContent = 'Register Controller response: ' + JSON.stringify(response);
+            });
+        }
+    </script>
+</head>
+<body>
+    <h1>Socket.IO Test Page</h1>
+    <p>Connection Status: <span id="status">Not Connected</span></p>
+    <p>Socket ID: <span id="socketId">None</span></p>
+    <button onclick="testRegisterHost()">Test Register Host</button>
+    <button onclick="testRegisterController()">Test Register Controller</button>
+    <p>Test Result: <span id="testResult"></span></p>
+</body>
+</html>

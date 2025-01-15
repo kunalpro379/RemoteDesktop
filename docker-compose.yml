@@ -1,0 +1,32 @@
+version: '3'
+
+services:
+  app:
+    build: .
+    ports:
+      - "3000:3000"  # Node.js app port
+    depends_on:
+      - kurento
+    environment:
+      - KURENTO_WS_URI=ws://kurento:8888/kurento
+      - NODE_ENV=production
+    networks:
+      - app-network
+
+  kurento:
+    image: kurento/kurento-media-server:latest
+    ports:
+      - "8888:8888"  # Kurento WebSocket port
+    environment:
+      - GST_DEBUG=2,Kurento*:4
+    networks:
+      - app-network
+    volumes:
+      - kurento-data:/var/lib/kurento
+
+networks:
+  app-network:
+    driver: bridge
+
+volumes:
+  kurento-data:
