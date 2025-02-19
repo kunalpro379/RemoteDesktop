@@ -30,7 +30,16 @@ export default class presenter {
 
     init() {
         var script = document.createElement('script');
-        script.setAttribute("src", window.location.protocol + "//" + "127.0.0.1:3096/socket.io/socket.io.js");
+        // Use window.location.hostname instead of hardcoded IP
+        script.setAttribute("src", 
+            window.location.protocol + "//" + 
+            window.location.hostname + ":" +
+            window.location.port + 
+            "/socket.io/socket.io.js"
+        );
+        script.onerror = () => {
+            console.error('Failed to load socket.io client');
+        };
         script.onload = () => {
             this.registerNodeEvents();
         };
@@ -42,142 +51,176 @@ export default class presenter {
     }
 
     registerNodeEvents() {
-        let sessionId = (new URLSearchParams(window.location.search)).get("session_id");
-        this.socket = io.connect(window.location.protocol + "//" + window.location.hostname + ":" + this.nodePort, { query: 'session_id=' + sessionId });
+        if (typeof io === 'undefined') {
+            console.error('Socket.IO is not loaded');
+            this.showConnectionError('Connection library failed to load');
+            return;
+        }
 
-        this.socket.on("connect", () => {
-            console.log('Presenter socket connected:', {
-                socketId: this.socket.id,
-                isConnected: this.isConnected
+        let sessionId = (new URLSearchParams(window.location.search)).get("session_id");
+        
+        try {
+            // Get the current protocol and port
+            const protocol = window.location.protocol;
+            const port = window.location.port || (protocol === 'https:' ? '443' : '80');
+            const hostname = window.location.hostname;
+            
+            // Construct the server URL
+            this.serverUrl = `${protocol}//${hostname}:${port}`;
+
+            this.socket = io(this.serverUrl, {
+                query: `mobile=${this.mobileCheck()}&session_id=${sessionId}`,
+                reconnection: true,
+                reconnectionAttempts: 5,
+                reconnectionDelay: 1000,
+                secure: protocol === 'https:',
+                rejectUnauthorized: false,
+                transports: ['websocket', 'polling'],
+                timeout: 10000
             });
-            this.viewers = {};
-            this.socket.emit("registerPresenter", (result) => {
-                this.socket.emit("setMechanism", this.sharingOptions.mechanism);
-                if (!result) {
-                    this.validPresenter = false;
-                    console.error("Another presenter running");
+
+            // Add connection error handling
+            this.socket.on('connect_error', (error) => {
+                console.error('Socket connection error:', error);
+            });
+
+            this.socket.on("connect", () => {
+                console.log('Presenter socket connected:', {
+                    socketId: this.socket.id,
+                    isConnected: this.isConnected
+                });
+                this.viewers = {};
+                this.socket.emit("registerPresenter", (result) => {
+                    this.socket.emit("setMechanism", this.sharingOptions.mechanism);
+                    if (!result) {
+                        this.validPresenter = false;
+                        console.error("Another presenter running");
+                        this.onStatusChanged();
+                        return;
+                    }
+                    if (this.status.pauseOnDisconnect) {
+                        let tracks = this.getTracks();
+                        if (tracks[0]) {
+                            this.status.pauseOnDisconnect = false;
+                            tracks[0].enabled = true;
+                            this.socket.emit("presenterStartSharing");
+                        }
+                    }
+                });
+                this.isConnected = true;
+                this.onStatusChanged();
+            });
+
+            this.socket.on("disconnect", () => {
+                this.isConnected = false;
+                let tracks = this.getTracks();
+                if (tracks[0]) {
+                    if (tracks[0].enabled) {
+                        this.status.pauseOnDisconnect = true;
+                        tracks[0].enabled = false;
+                    }
+                }
+                this.onStatusChanged();
+            })
+
+            this.socket.on("sendExistingViewers", (viewers) => {
+                if (this.sharingOptions.mechanism == 'streamserver') {
+                    return;
+                }
+                viewers.forEach(viewer => {
+                    this.viewers[viewer.id] = viewer;
+                    this.createPeerConnection(viewer);
+                });
+                this.onStatusChanged();
+            });
+
+            this.socket.on("viewerRegistered", (viewer) => {
+                this.viewers[viewer.id] = viewer;
+                if (this.sharingOptions.mechanism == 'streamserver') {
                     this.onStatusChanged();
                     return;
                 }
-                if (this.status.pauseOnDisconnect) {
-                    let tracks = this.getTracks();
-                    if (tracks[0]) {
-                        this.status.pauseOnDisconnect = false;
-                        tracks[0].enabled = true;
-                        this.socket.emit("presenterStartSharing");
-                    }
+                if (viewer.sender == this.socket.id) {
+                    this.createPeerConnection(viewer);
                 }
-            });
-            this.isConnected = true;
-            this.onStatusChanged();
-        });
-
-        this.socket.on("disconnect", () => {
-            this.isConnected = false;
-            let tracks = this.getTracks();
-            if (tracks[0]) {
-                if (tracks[0].enabled) {
-                    this.status.pauseOnDisconnect = true;
-                    tracks[0].enabled = false;
+                else {
+                    this.socket.emit("senderCreatePeerConnection", { viewer: viewer.id, sender: viewer.sender });
                 }
-            }
-            this.onStatusChanged();
-        })
-
-        this.socket.on("sendExistingViewers", (viewers) => {
-            if (this.sharingOptions.mechanism == 'streamserver') {
-                return;
-            }
-            viewers.forEach(viewer => {
-                this.viewers[viewer.id] = viewer;
-                this.createPeerConnection(viewer);
-            });
-            this.onStatusChanged();
-        });
-
-        this.socket.on("viewerRegistered", (viewer) => {
-            this.viewers[viewer.id] = viewer;
-            if (this.sharingOptions.mechanism == 'streamserver') {
                 this.onStatusChanged();
-                return;
-            }
-            if (viewer.sender == this.socket.id) {
-                this.createPeerConnection(viewer);
-            }
-            else {
-                this.socket.emit("senderCreatePeerConnection", { viewer: viewer.id, sender: viewer.sender });
-            }
-            this.onStatusChanged();
-        });
-
-        this.socket.on("viewerLeave", (viewer) => {
-            delete this.viewers[viewer.id];
-            this.onStatusChanged();
-        });
-
-        this.socket.on("sendViewerOffer", (data) => {
-            if (this.sharingOptions.mechanism == 'streamserver') {
-                return;
-            }
-            this.viewers[data.id].peerConnection.setRemoteDescription(data.offer);
-        });
-
-        this.socket.on("sendViewerCandidate", (data) => {
-            if (this.sharingOptions.mechanism == 'streamserver') {
-                return;
-            }
-            this.viewers[data.id].peerConnection.addIceCandidate(data.candidate)
-        });
-
-        this.socket.on("streamserverPresenterAvailable", () => {
-            this.socket.emit("presenterStartSharing");
-        });
-
-        this.socket.on("message", (message) => {
-            var parsedMessage = JSON.parse(message);
-
-            switch (parsedMessage.id) {
-                case 'presenterResponse':
-                    this.presenterResponse(parsedMessage);
-                    break;
-                case 'stopCommunication':
-                    this.dispose();
-                    break;
-                case 'iceCandidate':
-                    this.webRtcPeer.addIceCandidate(parsedMessage.candidate)
-                    break;
-                default:
-                    console.error('Unrecognized message', parsedMessage);
-            }
-        });
-
-        // Handle viewer cursor updates
-        /*
-        this.socket.on('cursorPosition', (data) => {
-            console.log('Presenter received cursor data:', data);
-            this.replicateCursor(data);
-            
-            // Debug the cursor element
-            const cursor = this.cursors.get(data.viewerId);
-            if (cursor) {
-                console.log('Cursor element state:', {
-                    id: cursor.id,
-                    position: {
-                        left: cursor.style.left,
-                        top: cursor.style.top
-                    },
-                    visible: cursor.isConnected,
-                    bounds: cursor.getBoundingClientRect()
-                });
-            }
-
-            // Broadcast replicated cursor to all viewers
-            this.socket.emit('presenterCursorUpdate', {
-                ...data,
-                viewerId: data.viewerId
             });
-        });
-        */
+
+            this.socket.on("viewerLeave", (viewer) => {
+                delete this.viewers[viewer.id];
+                this.onStatusChanged();
+            });
+
+            this.socket.on("sendViewerOffer", (data) => {
+                if (this.sharingOptions.mechanism == 'streamserver') {
+                    return;
+                }
+                this.viewers[data.id].peerConnection.setRemoteDescription(data.offer);
+            });
+
+            this.socket.on("sendViewerCandidate", (data) => {
+                if (this.sharingOptions.mechanism == 'streamserver') {
+                    return;
+                }
+                this.viewers[data.id].peerConnection.addIceCandidate(data.candidate)
+            });
+
+            this.socket.on("streamserverPresenterAvailable", () => {
+                this.socket.emit("presenterStartSharing");
+            });
+
+            this.socket.on("message", (message) => {
+                var parsedMessage = JSON.parse(message);
+
+                switch (parsedMessage.id) {
+                    case 'presenterResponse':
+                        this.presenterResponse(parsedMessage);
+                        break;
+                    case 'stopCommunication':
+                        this.dispose();
+                        break;
+                    case 'iceCandidate':
+                        this.webRtcPeer.addIceCandidate(parsedMessage.candidate)
+                        break;
+                    default:
+                        console.error('Unrecognized message', parsedMessage);
+                }
+            });
+
+            // Handle viewer cursor updates
+            /*
+            this.socket.on('cursorPosition', (data) => {
+                console.log('Presenter received cursor data:', data);
+                this.replicateCursor(data);
+                
+                // Debug the cursor element
+                const cursor = this.cursors.get(data.viewerId);
+                if (cursor) {
+                    console.log('Cursor element state:', {
+                        id: cursor.id,
+                        position: {
+                            left: cursor.style.left,
+                            top: cursor.style.top
+                        },
+                        visible: cursor.isConnected,
+                        bounds: cursor.getBoundingClientRect()
+                    });
+                }
+
+                // Broadcast replicated cursor to all viewers
+                this.socket.emit('presenterCursorUpdate', {
+                    ...data,
+                    viewerId: data.viewerId
+                });
+            });
+            */
+        } catch (err) {
+            console.error('Failed to initialize socket:', err);
+            this.showConnectionError('Failed to initialize connection: ' + err.message);
+        }
     }
         
 

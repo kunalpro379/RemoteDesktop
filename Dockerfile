@@ -33,17 +33,23 @@ RUN npm cache clean --force && \
 # Copy app source (excluding node_modules)
 COPY . .
 
+# Create certs directory
+RUN mkdir -p /app/certs
+
+# Copy SSL certificates
+COPY certs/private.key /app/certs/
+COPY certs/certificate.crt /app/certs/
+
 # Environment variables
 ENV NODE_ENV=production \
     KURENTO_WS_URI=ws://kurento:8888/kurento \
     NODE_PORT=3096 \
+    HTTPS_PORT=3097 \
     DATABASE_URL="postgresql://user:Lawm2471@host.docker.internal:5432/dbname" \
     DISPLAY=:99
 
-# Expose the correct port
-EXPOSE 3096
-EXPOSE 8888
-
+# Expose both HTTP and HTTPS ports
+EXPOSE 3096 3097 8888
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=30s --start-period=5s --retries=3 \

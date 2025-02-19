@@ -1,6 +1,9 @@
 // server.js
 const httpPort = 3096;
+const httpsPort = 3097;  // New HTTPS port
 const http = require('http');
+// const https = require('https');
+const fs = require('fs');
 const express = require('express');
 const path = require('path');
 const cors = require('cors');
@@ -13,20 +16,45 @@ const robot = require('robotjs'); // Add this line
 // Create Express app
 const app = express();
 
-// Create an HTTP server
-const server = http.createServer(app);
+// SSL certificates
+// const options = {
+//     key: fs.readFileSync('certs/private.key'),
+//     cert: fs.readFileSync('certs/certificate.crt')
+// };
 
-// Set up Socket.IO with CORS configuration
-const sio = require('socket.io')({
+// Simplify to just HTTP for local development
+const httpServer = http.createServer(app);
+
+// Update CORS settings
+app.use(cors({
+    origin: "*",
+    methods: ["GET", "POST"],
+    credentials: true
+}));
+
+// Simplify Socket.IO setup
+const io = require('socket.io')(httpServer, {
     cors: {
         origin: "*",
         methods: ["GET", "POST"],
-        transports: ['websocket', 'polling']
+        credentials: true
     }
 });
 
-// Attach Socket.IO to the server
-sio.attach(server);
+// Remove the HTTP to HTTPS redirect for socket.io paths
+// app.use((req, res, next) => {
+//     if (!req.secure && !req.url.includes('/socket.io/')) {
+//         return res.redirect(['https://', req.hostname, ':', httpsPort, req.url].join(''));
+//     }
+//     next();
+// });
+
+app.use((req, res, next) => {
+    if (!req.secure && !req.url.includes('/socket.io/')) {
+        return res.redirect(['http://', req.hostname, ':', httpPort, req.url].join(''));
+    }
+    next();
+});
 
 // Import routes
 const hostRoutes = require('./routes/host.routes');
@@ -43,7 +71,9 @@ app.use(function (req, res, next) {
     res.setHeader('Access-Control-Allow-Headers', 'X-Requested-With,content-type');
     res.setHeader('Access-Control-Allow-Credentials', true);
     res.setHeader('Cross-Origin-Opener-Policy', 'same-origin');
-    res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+    // res.setHeader('Cross-Origin-Embedder-Policy', 'require-corp');
+    // res.setHeader('Feature-Policy', 'display-capture *');
+    // res.setHeader('Permissions-Policy', 'display-capture=(self)');
     next();
 });
 // Static files middleware
@@ -63,12 +93,12 @@ app.use('/api/user', userRoutes);  // Unprotected route
 app.use(errorHandler);
 
 // Initialize Kurento Manager
-const kurentoManager = new KurentoManager('3.111.33.37', 8888);
+const kurentoManager = new KurentoManager('127.0.0.1', 8888);
 
 // Initialize Socket Handler
-new SocketHandler(sio, kurentoManager);
+new SocketHandler(io, kurentoManager);
 
-sio.on('connection', (socket) => {
+io.on('connection', (socket) => {
     
     socket.on('cursorPosition', (data) => {
         try {
@@ -114,9 +144,9 @@ sio.on('connection', (socket) => {
     });
 });
 
-// Start the server and listen on the specified port
-server.listen(httpPort, () => {
-    console.log(`Http server listening at port ${httpPort}`);
+// Start only HTTP server
+httpServer.listen(httpPort, () => {
+    console.log(`HTTP server running on port ${httpPort}`);
 });
 
 

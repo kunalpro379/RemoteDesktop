@@ -8,9 +8,20 @@
     <meta name='viewport' content='width=device-width, initial-scale=1'>
     <link rel='stylesheet' type='text/css' media='screen' href='assets/style/viewer.css'>
 
-    <script src="./assets/bower_components/webrtc-adapter/release/adapter.js"></script>
-    <script src="./assets/bower_components/kurento-client/js/kurento-client.js"></script>
-    <script src="./assets/bower_components/kurento-utils/js/kurento-utils.js"></script>
+    <script src="https://webrtc.github.io/adapter/adapter-latest.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/kurento-client"></script>
+    <script src="https://cdn.jsdelivr.net/npm/kurento-utils"></script>
+    
+    <!-- Fallback scripts -->
+    <script>
+    window.addEventListener('error', function(e) {
+        if (e.target.tagName === 'SCRIPT') {
+            console.warn('Failed to load:', e.target.src);
+            // Add fallback loading logic here
+        }
+    }, true);
+    </script>
+    
     <style>
         /* Add debug styles directly */
         #cursorDebug {
@@ -22,6 +33,43 @@
             padding: 5px;
             z-index: 999999;
             font-size: 12px;
+        }
+    </style>
+
+    <script>
+        // Load Socket.IO from the correct server
+        (function loadSocketIO() {
+            var script = document.createElement('script');
+            script.src = 'http://localhost:3096/socket.io/socket.io.js';
+            script.onerror = function() {
+                console.error('Failed to load socket.io from', script.src);
+                document.body.innerHTML = '<div style="color: red; padding: 20px;">Failed to connect to server. Please make sure the server is running on port 3096.</div>';
+            };
+            document.head.appendChild(script);
+        })();
+    </script>
+
+    <!-- Add connection status styles -->
+    <style>
+        .connection-error {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            background: #ff4444;
+            color: white;
+            padding: 10px;
+            text-align: center;
+            z-index: 9999;
+        }
+        #connectionStatus {
+            position: fixed;
+            bottom: 10px;
+            right: 10px;
+            padding: 5px 10px;
+            background: rgba(0,0,0,0.7);
+            color: white;
+            border-radius: 4px;
         }
     </style>
 </head>
@@ -56,17 +104,39 @@
     <!-- Add debug overlay -->
     <div id="cursorDebug"></div>
 
+    <!-- Add connection status element -->
+    <div id="connectionStatus">Connecting...</div>
+
     <script type="module">
         import viewer from './assets/js/viewer.js';
         console.log('Initializing viewer...');
         
         var events = { 'start': null, 'stop': null };
-        var viewerObj = new viewer({
-            player: document.getElementById('plrVideo'),
-            iceServers: [
-                { urls: "stun:stun.l.google.com:19302" },
-            ]
-        });
+        let viewerObj;
+        try {
+            viewerObj = new viewer({
+                player: document.getElementById('plrVideo'),
+                iceServers: [
+                    { urls: "stun:stun.l.google.com:19302" },
+                ]
+            });
+            
+            // Update connection status
+            const statusEl = document.getElementById('connectionStatus');
+            viewerObj.socket?.on('connect', () => {
+                statusEl.style.background = '#4CAF50';
+                statusEl.textContent = 'Connected';
+            });
+            
+            viewerObj.socket?.on('disconnect', () => {
+                statusEl.style.background = '#ff4444';
+                statusEl.textContent = 'Disconnected';
+            });
+
+        } catch (err) {
+            console.error('Failed to initialize viewer:', err);
+            document.body.innerHTML = `<div style="color: red; padding: 20px;">Error: ${err.message}</div>`;
+        }
 
 const videoElement = document.getElementById('plrVideo');
 const debug = document.getElementById('cursorDebug');
